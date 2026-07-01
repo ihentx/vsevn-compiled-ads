@@ -1689,6 +1689,9 @@
     applyTableCellWrap();
     applyContactTableCellWrap();
     bindRowInteractions();
+    // Панель статична (вектор) — перерисовываем после смены данных/фильтров/
+    // страницы/счётчика. Таблицу не трогаем. maskEl кэш-защищён (skip без изменений).
+    renderPanelStatic();
   }
 
   window.__afterTableCellLayout = afterTableCellLayout;
@@ -2163,6 +2166,9 @@
     updateCount(page.total);
     renderPagination(page.totalPages);
     bindRowInteractions();
+    // Панель — вектор: перерисовываем синхронно (не полагаемся на rAF), чтобы
+    // счётчик/пагинация/жирность фильтров обновлялись сразу после смены данных.
+    renderPanelStatic();
     requestAnimationFrame(afterTableCellLayout);
   }
 
@@ -2720,7 +2726,7 @@
         row.querySelectorAll(".ads-radio").forEach(function (x) {
           x.classList.toggle("is-active", x === r);
         });
-        renderRadioStatic();
+        renderPanelStatic();
         appState.currentPage = 1;
         renderTable();
       });
@@ -3359,19 +3365,49 @@
     });
   }
 
-  function renderRadioStatic() {
+  // Панель управления → вектор <text>: статична и в обычном зуме, и в
+  // «Только текст», при этом копируется. Таблицу (заголовки + тело) НЕ трогаем.
+  // Цвет НЕ задаём → fill=currentColor → берётся из CSS (в т.ч. активные
+  // состояния радио/чекбоксов/дропдаунов). Перерисовка — только на init и после
+  // смены данных/состояния (renderTable → afterTableCellLayout), НЕ на зум.
+  // У динамических подписей (значение даты, счётчик, выбранное значение списка)
+  // dataset.text уже поддерживается их сеттерами, поэтому re-mask берёт актуальный текст.
+  function renderPanelStatic() {
     if (!staticAvailable()) return;
+    function mp(el, size, weight) {
+      if (el) maskEl(el, { size: size, weight: weight, maxW: 1200 });
+    }
     document.querySelectorAll("#adsRadioRow .ads-radio").forEach(function (r) {
-      const el = r.querySelector(".ads-radio-text");
-      if (!el) return;
-      // Текст радио-фильтра — вектором <text> (статичен в «Только текст»).
-      // Цвет НЕ задаём → fill=currentColor → берётся из CSS (var(--c-text) /
-      // var(--c-link) по классу is-active), поэтому активный синий работает сам;
-      // перерисовываем только из-за смены жирности (300↔400) на выборе.
-      maskEl(el, {
-        size: 21.6,
-        weight: r.classList.contains("is-active") ? 400 : 300,
-      });
+      mp(
+        r.querySelector(".ads-radio-text"),
+        21.6,
+        r.classList.contains("is-active") ? 400 : 300,
+      );
+    });
+    document.querySelectorAll(".ads-check-label").forEach(function (el) {
+      mp(el, 21.6, el.classList.contains("is-checked") ? 400 : 300);
+    });
+    document.querySelectorAll(".ads-date-label").forEach(function (el) {
+      mp(el, 21.6, 300);
+    });
+    document.querySelectorAll(".ads-date-value").forEach(function (el) {
+      mp(el, 21.6, 300);
+    });
+    mp(document.querySelector(".ads-count-label"), 21.6, 300);
+    mp(document.getElementById("adsCountNum"), 21.6, 300);
+    document.querySelectorAll(".ads-dropdown-text").forEach(function (el) {
+      mp(el, 22, 300);
+    });
+    mp(document.querySelector(".ads-delete-text"), 14, 100);
+    mp(document.querySelector(".ads-export-text"), 21, 200);
+    mp(document.querySelector(".ads-export-xml"), 21, 300);
+    document.querySelectorAll("#pagination button").forEach(function (b) {
+      var s = b.classList.contains("is-edge")
+        ? 16
+        : b.classList.contains("ellipsis")
+          ? 20
+          : 22;
+      mp(b, s, b.classList.contains("active") ? 400 : 300);
     });
   }
 
@@ -3380,7 +3416,7 @@
     document.querySelectorAll(".ads-th-text").forEach(maskTableHeaderText);
     if (!staticAvailable()) return;
     maskLegendRows();
-    renderRadioStatic();
+    renderPanelStatic();
     const T = C.textPrimary || "#62560E";
     const title = document.querySelector(".ads-title");
     if (title) {
