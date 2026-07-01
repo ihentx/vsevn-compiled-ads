@@ -1173,7 +1173,7 @@ function splitTextIntoLines(text, maxChars) {
 const bitmapTextMaskCache = new Map();
 let bitmapTextMaskCounter = 0;
 let bitmapTextFontVersion = 0;
-let textRenderMode = "bitmap";
+let textRenderMode = "vector";
 let textRenderModeVersion = 0;
 let viewportTextVersion = 0;
 let lastViewportTextSignature = "";
@@ -2062,7 +2062,10 @@ function getSvgTextZoomFactor() {
 }
 
 function updateSvgTextZoomCompensation() {
-  const nextMode = "bitmap";
+  // Вектор вместо bitmap-маски: текст рисуется настоящим SVG <text> — он
+  // копируется/выделяется (как в эталоне) и масштабируется гладко, без
+  // ресэмпл-дрожания растровой маски на дробных масштабах.
+  const nextMode = "vector";
   const changed = nextMode !== textRenderMode;
 
   if (changed) {

@@ -2720,6 +2720,7 @@
         row.querySelectorAll(".ads-radio").forEach(function (x) {
           x.classList.toggle("is-active", x === r);
         });
+        renderRadioStatic();
         appState.currentPage = 1;
         renderTable();
       });
@@ -3358,11 +3359,28 @@
     });
   }
 
+  function renderRadioStatic() {
+    if (!staticAvailable()) return;
+    document.querySelectorAll("#adsRadioRow .ads-radio").forEach(function (r) {
+      const el = r.querySelector(".ads-radio-text");
+      if (!el) return;
+      // Текст радио-фильтра — вектором <text> (статичен в «Только текст»).
+      // Цвет НЕ задаём → fill=currentColor → берётся из CSS (var(--c-text) /
+      // var(--c-link) по классу is-active), поэтому активный синий работает сам;
+      // перерисовываем только из-за смены жирности (300↔400) на выборе.
+      maskEl(el, {
+        size: 21.6,
+        weight: r.classList.contains("is-active") ? 400 : 300,
+      });
+    });
+  }
+
   function applyAdsStatic() {
     applyLegendColors();
     document.querySelectorAll(".ads-th-text").forEach(maskTableHeaderText);
     if (!staticAvailable()) return;
     maskLegendRows();
+    renderRadioStatic();
     const T = C.textPrimary || "#62560E";
     const title = document.querySelector(".ads-title");
     if (title) {
