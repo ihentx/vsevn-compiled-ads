@@ -3439,6 +3439,33 @@
           : 22;
       mp(b, s, b.classList.contains("active") ? 400 : 300);
     });
+    // КЛЮЧЕВОЕ: обнуляем font-size/line-height на замаскированных элементах и их
+    // inline-контейнерах. Иначе в Firefox «Только текст» СОБСТВЕННЫЙ размер шрифта
+    // элемента (vw) растёт → растёт line-height (текст-контрол уезжает вверх, как
+    // «500»/«Экспорт») и пробел между подписью и значением (значение уезжает
+    // вправо и обрезается, как даты/счётчик). Видимый текст — это SVG со своим
+    // размером, поэтому обнуление шрифта элемента ни на что не влияет визуально.
+    [
+      "#adsRadioRow .ads-radio-text",
+      ".ads-check-label",
+      ".ads-date-label",
+      ".ads-date-value",
+      ".ads-date-line",
+      ".ads-count-label",
+      "#adsCountNum",
+      ".ads-count-line",
+      ".ads-dropdown-text",
+      ".ads-delete-text",
+      ".ads-export-text",
+      ".ads-export-xml",
+      ".ads-export-line",
+      "#pagination button",
+    ].forEach(function (sel) {
+      document.querySelectorAll(sel).forEach(function (el) {
+        el.style.setProperty("font-size", "0", "important");
+        el.style.setProperty("line-height", "0", "important");
+      });
+    });
   }
 
   function applyAdsStatic() {
