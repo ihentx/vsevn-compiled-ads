@@ -3387,17 +3387,47 @@
     document.querySelectorAll(".ads-check-label").forEach(function (el) {
       mp(el, 21.6, el.classList.contains("is-checked") ? 400 : 300);
     });
+    // Даты — только плотнее по ширине (textPad:0), чтобы значение не упиралось в
+    // край поля (у поля overflow:hidden обрезал последнюю цифру при зуме).
+    // Вертикаль дат НЕ трогаем — они «съезжали» вправо, а не вверх.
+    function mpw(el, size, weight) {
+      if (el) maskEl(el, { size: size, weight: weight, maxW: 1200, textPad: 0 });
+    }
     document.querySelectorAll(".ads-date-label").forEach(function (el) {
-      mp(el, 21.6, 300);
+      mpw(el, 21.6, 300);
     });
     document.querySelectorAll(".ads-date-value").forEach(function (el) {
-      mp(el, 21.6, 300);
+      mpw(el, 21.6, 300);
     });
     mp(document.querySelector(".ads-count-label"), 21.6, 300);
     mp(document.getElementById("adsCountNum"), 21.6, 300);
-    document.querySelectorAll(".ads-dropdown-text").forEach(function (el) {
-      mp(el, 22, 300);
-    });
+    // Выпадающие списки (бокс 50px): «500» уезжало вверх — центрируем текст ВНУТРИ
+    // SVG (lineBandCenter + ctrlLayout), тогда вертикаль стабильна и при зуме
+    // (не зависит от line-box). Текст сам в 50px-боксе, центрируется чисто.
+    function mpc(el, size, weight, ctrl) {
+      if (el)
+        maskEl(el, {
+          size: size,
+          weight: weight,
+          maxW: 1200,
+          textPad: 0,
+          lineBandCenter: true,
+          ctrlLayout: ctrl,
+        });
+    }
+    mpc(
+      document.querySelector(".ads-dropdown--rows .ads-dropdown-text"),
+      22,
+      300,
+      "216-dg",
+    );
+    document
+      .querySelectorAll(
+        ".ads-dropdown--xml .ads-dropdown-text, .ads-dropdown--groups .ads-dropdown-text",
+      )
+      .forEach(function (el) {
+        mpc(el, 22, 300, "216-lc");
+      });
     mp(document.querySelector(".ads-delete-text"), 14, 100);
     mp(document.querySelector(".ads-export-text"), 21, 200);
     mp(document.querySelector(".ads-export-xml"), 21, 300);

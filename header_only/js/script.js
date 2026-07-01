@@ -1761,7 +1761,11 @@ function renderWrappedElementText(element, options = {}) {
 
 function renderNavIcon(item, hovered = false) {
   const icon = item.querySelector(".icon");
-  if (icon && /\bicon-/.test(icon.className)) return;
+  // Раньше здесь был ранний выход для классов icon-* (иконки-шрифт через CSS
+  // ::before). Из-за него иконки меню оставались шрифтом и РОСЛИ в «Только
+  // текст». Теперь рисуем глиф через SVG <text> тем же шрифтом vsevn-nav-icons
+  // (коды совпадают с CSS ::before; класс has-static-icon прячет ::before) —
+  // иконка та же, в путь/картинку НЕ переводится, но становится статичной.
   const config = navIconConfig[item.dataset.tab];
   if (!icon || !config) return;
 
