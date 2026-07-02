@@ -1173,7 +1173,7 @@ function splitTextIntoLines(text, maxChars) {
 const bitmapTextMaskCache = new Map();
 let bitmapTextMaskCounter = 0;
 let bitmapTextFontVersion = 0;
-let textRenderMode = "vector";
+let textRenderMode = "bitmap";
 let textRenderModeVersion = 0;
 let viewportTextVersion = 0;
 let lastViewportTextSignature = "";
@@ -1761,11 +1761,10 @@ function renderWrappedElementText(element, options = {}) {
 
 function renderNavIcon(item, hovered = false) {
   const icon = item.querySelector(".icon");
-  // Раньше здесь был ранний выход для классов icon-* (иконки-шрифт через CSS
-  // ::before). Из-за него иконки меню оставались шрифтом и РОСЛИ в «Только
-  // текст». Теперь рисуем глиф через SVG <text> тем же шрифтом vsevn-nav-icons
-  // (коды совпадают с CSS ::before; класс has-static-icon прячет ::before) —
-  // иконка та же, в путь/картинку НЕ переводится, но становится статичной.
+  // Иконки меню — глиф иконочного шрифта через CSS ::before (как в оригинале и
+  // по ТЗ «иконки не переводить в svg/другой формат»). Не рендерим их как SVG
+  // <text>: ранний выход для классов icon-*.
+  if (icon && /\bicon-/.test(icon.className)) return;
   const config = navIconConfig[item.dataset.tab];
   if (!icon || !config) return;
 
@@ -2066,10 +2065,10 @@ function getSvgTextZoomFactor() {
 }
 
 function updateSvgTextZoomCompensation() {
-  // Вектор вместо bitmap-маски: текст рисуется настоящим SVG <text> — он
-  // копируется/выделяется (как в эталоне) и масштабируется гладко, без
-  // ресэмпл-дрожания растровой маски на дробных масштабах.
-  const nextMode = "vector";
+  // Bitmap-маска (как в оригинале): именно этот рендер заказчик называл
+  // пиксель-перфектом. Тело таблицы остаётся живым HTML (копируемым), поэтому
+  // потеря копируемости масок панели/заголовков некритична.
+  const nextMode = "bitmap";
   const changed = nextMode !== textRenderMode;
 
   if (changed) {

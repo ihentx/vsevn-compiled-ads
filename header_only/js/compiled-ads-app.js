@@ -2377,14 +2377,16 @@
   }
 
   function initAdsTipViewportSync() {
-    function syncAdsTipPosition() {
-      if (adsTipEl && adsTipAnchor) positionAdsTipElement();
-    }
-    window.addEventListener("resize", syncAdsTipPosition);
-    window.addEventListener("scroll", syncAdsTipPosition, true);
+    // При скролле/ресайзе/зуме подсказку НЕ репозиционируем, а СКРЫВАЕМ.
+    // Репозиционирование на эти события давало «прыжки» тултипа и фантомные
+    // подсказки при изменении масштаба (замечание #2). Подсказка показывается
+    // только по реальному наведению (mouseenter), а любое изменение вьюпорта её
+    // прячет — как в статичном эталоне.
+    window.addEventListener("resize", hideAdsTip);
+    window.addEventListener("scroll", hideAdsTip, true);
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", syncAdsTipPosition);
-      window.visualViewport.addEventListener("scroll", syncAdsTipPosition);
+      window.visualViewport.addEventListener("resize", hideAdsTip);
+      window.visualViewport.addEventListener("scroll", hideAdsTip);
     }
   }
 
@@ -3466,6 +3468,18 @@
         el.style.setProperty("line-height", "0", "important");
       });
     });
+    // Зазор подпись→значение восстанавливаем СТАТИЧНЫМ vw-отступом. В оригинале
+    // он был: у дат — ширина text-node пробела между спанами, у счётчика —
+    // margin-left:0.28em у .ads-count-num. При font-size:0 (нужен, чтобы значение
+    // не росло/не обрезалось в «Только текст») оба схлопывались в 0 → «ДАТА
+    // ОТ12.05.2023», «ЛОГОВ:500» (замечание #5). vw-отступ держит зазор пиксель-
+    // в-пиксель как в макете И не растёт в «Только текст» (в отличие от em/пробела).
+    document.querySelectorAll(".ads-date-value").forEach(function (el) {
+      el.style.setProperty("margin-left", "0.28vw", "important"); // ~5.4px @1920 = ширина пробела 21.6px
+    });
+    var countNumEl = document.getElementById("adsCountNum");
+    if (countNumEl)
+      countNumEl.style.setProperty("margin-left", "0.315vw", "important"); // 0.28em @21.6px = 6.05px @1920
   }
 
   function applyAdsStatic() {
