@@ -1752,40 +1752,99 @@
     if (!staticAvailable()) return;
     var tbody = document.getElementById("adsTableBody");
     if (!tbody) return;
-    var candidates = [];
-    tbody.querySelectorAll("td .ads-cell-line").forEach(function (line) {
-      if (line.closest("td.col-text")) return; // большая колонка — отдельно
-      if (line.classList.contains("ads-status-line")) return; // бейдж — отдельно
-      if (line.querySelector("a, button, .ads-copy-ico, .search-highlight, img, svg"))
-        return; // интерактив/подсветка/уже замаскировано — отдельно
+    var thead = document.getElementById("adsTableHead");
+    var cand = []; // {el, size, longBlock}
+    // 1) простые текст-строки тела (без интерактива/подсветки; без большой колонки/бейджа)
+    tbody.querySelectorAll("td:not(.col-text) .ads-cell-line").forEach(function (line) {
+      if (line.classList.contains("ads-status-line")) return; // бейдж (пилюля, em-паддинг) — пока живой
+      if (line.querySelector("a, button, .ads-copy-ico, .search-highlight, img, svg")) return;
       if (!(line.textContent || "").trim()) return;
-      candidates.push(line);
+      cand.push({ el: line, size: 20, longBlock: false });
     });
-    // Проход 1 — только чтение (перенос строк по факту рендера).
-    var plan = candidates.map(function (line) {
-      var td = line.closest("td");
-      var count = capturedLineCount(line);
+    // 2) ссылки — маскируем текст самого <a> (он остаётся кликабельным)
+    tbody.querySelectorAll("td a.ads-cell-link, td a.ads-fio-link").forEach(function (a) {
+      if (a.querySelector(".search-highlight, svg")) return;
+      if (a.children.length) return; // только чистый текст
+      if (!(a.textContent || "").trim()) return;
+      cand.push({ el: a, size: 20, longBlock: false });
+    });
+    // (заголовки маскируются отдельно — maskTableHeaders() из applyAdsStatic,
+    //  ПОСЛЕ maskTableHeaderText, иначе тот перерисует их живым текстом поверх)
+    // 4) большая колонка «ТЕКСТ ОБЪЯВЛЕНИЯ» — длинный блок (break-all) → wordWrap
+    tbody.querySelectorAll("td.col-text .ads-text-html, td.col-text .ads-text-plain > div").forEach(function (el) {
+      if (el.querySelector(".search-highlight, svg")) return;
+      if (el.children.length) return;
+      if (!(el.textContent || "").trim()) return;
+      cand.push({ el: el, size: 20, longBlock: true });
+    });
+    // Проход 1 — только чтение (перенос строк по факту рендера; без записи в DOM).
+    var plan = cand.map(function (c) {
+      var td = c.el.closest("td, th");
+      var text = (c.el.textContent || "").trim();
+      if (c.longBlock) return { el: c.el, size: c.size, preset: null, maxW: tdContentDesignPx(td) };
+      var count = capturedLineCount(c.el);
       if (count <= 1) {
         // одна строка (в т.ч. nowrap): натуральная ширина, лишнее обрежет td (overflow:hidden)
-        return { line: line, preset: [(line.textContent || "").trim()], maxW: 4000 };
+        return { el: c.el, size: c.size, preset: [text], maxW: 6000 };
       }
-      var vis = capturedVisualLines(line);
-      return { line: line, preset: vis, maxW: tdContentDesignPx(td) };
+      if (text.length <= 100) return { el: c.el, size: c.size, preset: capturedVisualLines(c.el), maxW: tdContentDesignPx(td) };
+      return { el: c.el, size: c.size, preset: null, maxW: tdContentDesignPx(td) }; // длинная строка → wordWrap
     });
-    // Проход 2 — запись (маскирование в SVG).
+    // Проход 2 — запись (маскирование в SVG + font-size:0 на хосте).
     plan.forEach(function (p) {
-      maskEl(p.line, {
-        size: 20,
+      maskEl(p.el, {
+        size: p.size,
         weight: 300,
         maxW: p.maxW,
         fallbackW: p.maxW,
         multiline: true,
-        maxLines: 80,
-        lineHeight: 24,
+        maxLines: 400,
+        lineHeight: Math.round(p.size * 1.2),
         presetLines: p.preset && p.preset.length ? p.preset : undefined,
       });
-      p.line.style.setProperty("font-size", "0", "important");
-      p.line.style.setProperty("line-height", "0", "important");
+      p.el.style.setProperty("font-size", "0", "important");
+      p.el.style.setProperty("line-height", "0", "important");
+    });
+  }
+
+  // Заголовки колонок → вектор SVG. Вызывается из applyAdsStatic ПОСЛЕ
+  // maskTableHeaderText (тот раскладывает текст по .ads-th-text-line живым
+  // текстом; маскируем уже готовые строки, иначе он затрёт нашу маску).
+  function maskTableHeaders() {
+    if (!staticAvailable()) return;
+    var thead = document.getElementById("adsTableHead");
+    if (!thead) return;
+    var cand = [];
+    thead.querySelectorAll(".ads-th-text").forEach(function (th) {
+      if (th.querySelector(".search-highlight, svg")) return;
+      var lns = th.querySelectorAll(".ads-th-text-line");
+      if (lns.length) {
+        lns.forEach(function (l) {
+          if ((l.textContent || "").trim() && !l.children.length) cand.push(l);
+        });
+      } else if ((th.textContent || "").trim() && !th.children.length) {
+        cand.push(th);
+      }
+    });
+    var plan = cand.map(function (el) {
+      var text = (el.textContent || "").trim();
+      var count = capturedLineCount(el);
+      if (count <= 1) return { el: el, preset: [text], maxW: 6000 };
+      return { el: el, preset: capturedVisualLines(el), maxW: tdContentDesignPx(el.closest("th")) };
+    });
+    plan.forEach(function (p) {
+      maskEl(p.el, {
+        size: 21,
+        weight: 300,
+        maxW: p.maxW,
+        fallbackW: p.maxW,
+        multiline: true,
+        maxLines: 20,
+        lineHeight: 25,
+        presetLines: p.preset && p.preset.length ? p.preset : undefined,
+      });
+      p.el.style.setProperty("font-size", "0", "important");
+      p.el.style.setProperty("line-height", "0", "important");
     });
   }
 
@@ -3606,7 +3665,6 @@
         maxW: 400,
       });
     }
-    /* Заголовки колонок — живой текст для выделения/копирования (замечание заказчика п.5) */
     document.querySelectorAll(".ads-search-ph").forEach(function (el) {
       const field = el.closest(".ads-search-field");
       const isPhone = field && field.dataset.ctrlMode === "phone";
@@ -3619,6 +3677,11 @@
         lineBandCenter: true,
       });
     });
+    // ЗАГОЛОВКИ пока НЕ маскируем: их многострочная absolute-раскладка
+    // (.ads-th-line/.ads-th-text-line + кнопки сортировки) при маскировании
+    // рендерится частично (первые строки пустые). Оставляем живыми (растут в
+    // «Только текст» — отдельный шаг), но зато корректно отображаются.
+    // maskTableHeaders();  // TODO: доработать раскладку заголовков
   }
 
   window.__applyAdsStatic = applyAdsStatic;
