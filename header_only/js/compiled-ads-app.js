@@ -1685,13 +1685,119 @@
       });
   }
 
+  // Доступная для текста ширина ЯЧЕЙКИ в ДИЗАЙН-px (макет 1920 в vw). Берём
+  // именно контент-ширину <td> (clientWidth − паддинги), НЕ ширину строки
+  // (у строки она схлопнута под контент → перенос был бы слишком ранним).
+  function tdContentDesignPx(td) {
+    if (!td) return 200;
+    var cs = getComputedStyle(td);
+    var padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    var contentReal = td.clientWidth - padX;
+    var iw = window.innerWidth || 1920;
+    if (!contentReal || !iw) return 200;
+    return Math.max(24, Math.floor((contentReal * 1920) / iw) - 2);
+  }
+
+  // Захват РЕАЛЬНЫХ визуальных строк, как их перенёс браузер (у ячеек разные
+  // правила: nowrap+clip у одних, break-all у других — wordWrap их не повторит).
+  // Возвращает массив строк по факту рендера. Работает для простого текст-узла.
+  function firstTextNode(el) {
+    for (var n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3 && (n.nodeValue || "").trim()) return n;
+    }
+    return null;
+  }
+  function capturedLineCount(el) {
+    var tn = firstTextNode(el);
+    if (!tn) return 1;
+    var r = document.createRange();
+    r.selectNodeContents(tn);
+    var n = r.getClientRects().length;
+    return n || 1;
+  }
+  function capturedVisualLines(el) {
+    var tn = firstTextNode(el);
+    if (!tn) return null;
+    var s = tn.nodeValue;
+    var r = document.createRange();
+    var lines = [];
+    var lineStart = 0;
+    var curTop = null;
+    for (var i = 1; i <= s.length; i++) {
+      r.setStart(tn, i - 1);
+      r.setEnd(tn, i);
+      var top = r.getBoundingClientRect().top;
+      if (curTop === null) curTop = top;
+      else if (top - curTop > 1) {
+        lines.push(s.slice(lineStart, i - 1));
+        lineStart = i - 1;
+        curTop = top;
+      }
+    }
+    lines.push(s.slice(lineStart));
+    lines = lines
+      .map(function (l) { return l.replace(/\s+$/, "").replace(/^\s+/, ""); })
+      .filter(function (l) { return l.length; });
+    return lines.length ? lines : null;
+  }
+
+  // ШАГ 1 перевода таблицы в вектор (замечание #4: тело таблицы растёт в
+  // «Только текст»). Маскируем ПРОСТЫЕ текстовые строки тела в SVG <text> +
+  // font-size:0 на хосте (SVG-геометрия иммунна к text-zoom, как эталон),
+  // ПОВТОРЯЯ реальный перенос браузера (presetLines). Пока ПРОПУСКАЕМ:
+  // ссылки/кнопки/копирование, подсветку поиска, бейджи и большую колонку
+  // «ТЕКСТ ОБЪЯВЛЕНИЯ» — они идут отдельными шагами. Два прохода: сначала ЧТЕНИЕ
+  // геометрии (без записи в DOM, чтобы не гонять reflow), затем маскирование.
+  function maskTableCells() {
+    if (!staticAvailable()) return;
+    var tbody = document.getElementById("adsTableBody");
+    if (!tbody) return;
+    var candidates = [];
+    tbody.querySelectorAll("td .ads-cell-line").forEach(function (line) {
+      if (line.closest("td.col-text")) return; // большая колонка — отдельно
+      if (line.classList.contains("ads-status-line")) return; // бейдж — отдельно
+      if (line.querySelector("a, button, .ads-copy-ico, .search-highlight, img, svg"))
+        return; // интерактив/подсветка/уже замаскировано — отдельно
+      if (!(line.textContent || "").trim()) return;
+      candidates.push(line);
+    });
+    // Проход 1 — только чтение (перенос строк по факту рендера).
+    var plan = candidates.map(function (line) {
+      var td = line.closest("td");
+      var count = capturedLineCount(line);
+      if (count <= 1) {
+        // одна строка (в т.ч. nowrap): натуральная ширина, лишнее обрежет td (overflow:hidden)
+        return { line: line, preset: [(line.textContent || "").trim()], maxW: 4000 };
+      }
+      var vis = capturedVisualLines(line);
+      return { line: line, preset: vis, maxW: tdContentDesignPx(td) };
+    });
+    // Проход 2 — запись (маскирование в SVG).
+    plan.forEach(function (p) {
+      maskEl(p.line, {
+        size: 20,
+        weight: 300,
+        maxW: p.maxW,
+        fallbackW: p.maxW,
+        multiline: true,
+        maxLines: 80,
+        lineHeight: 24,
+        presetLines: p.preset && p.preset.length ? p.preset : undefined,
+      });
+      p.line.style.setProperty("font-size", "0", "important");
+      p.line.style.setProperty("line-height", "0", "important");
+    });
+  }
+
   function afterTableCellLayout() {
     applyTableCellWrap();
     applyContactTableCellWrap();
     bindRowInteractions();
     // Панель статична (вектор) — перерисовываем после смены данных/фильтров/
-    // страницы/счётчика. Таблицу не трогаем. maskEl кэш-защищён (skip без изменений).
+    // страницы/счётчика. maskEl кэш-защищён (skip без изменений).
     renderPanelStatic();
+    // ШАГ 1: простые текстовые ячейки тела → вектор (см. maskTableCells).
+    maskTableCells();
   }
 
   window.__afterTableCellLayout = afterTableCellLayout;

@@ -1761,10 +1761,10 @@ function renderWrappedElementText(element, options = {}) {
 
 function renderNavIcon(item, hovered = false) {
   const icon = item.querySelector(".icon");
-  // Иконки меню — глиф иконочного шрифта через CSS ::before (как в оригинале и
-  // по ТЗ «иконки не переводить в svg/другой формат»). Не рендерим их как SVG
-  // <text>: ранний выход для классов icon-*.
-  if (icon && /\bicon-/.test(icon.className)) return;
+  // Иконки меню рисуем глифом иконочного шрифта через SVG <text> (как в эталоне
+  // `верстка тест`): тот же шрифт и код, в path/картинку НЕ трассируем (смысл
+  // запрета ТЗ), но глиф становится SVG-геометрией → НЕ растёт в «Только текст».
+  // Класс has-static-icon прячет дублирующий ::before. Заказчик роста икон не просил.
   const config = navIconConfig[item.dataset.tab];
   if (!icon || !config) return;
 
