@@ -3587,6 +3587,17 @@
     document.documentElement.style.overflowY = "scroll";
     document.body.style.setProperty("overflow-y", "visible", "important");
 
+    // Таблица «уезжает» при обычном зуме (Тест 2): у `.ads-table-wrapper`
+    // стоит overflow-x:auto, а таблица по ширине совпадает с обёрткой впритык
+    // (~2px запаса). На ДРОБНОМ browser-zoom округление даёт под-пиксельное
+    // переполнение → у обёртки появляется горизонтальная полоса, и таблицу
+    // можно «сдвинуть». Страница по X уже обрезается (html/body overflow-x:hidden),
+    // поэтому и обёртку переводим в hidden: под-пиксельное переполнение просто
+    // обрезается (≤1px рамки последней колонки, невидимо), полосы и сдвига нет.
+    var adsTableWrap = document.querySelector(".ads-table-wrapper");
+    if (adsTableWrap)
+      adsTableWrap.style.setProperty("overflow-x", "hidden", "important");
+
     if (typeof renderStaticText === "function") renderStaticText();
     requestAnimationFrame(applyAdsStatic);
   }
