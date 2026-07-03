@@ -1173,7 +1173,7 @@ function splitTextIntoLines(text, maxChars) {
 const bitmapTextMaskCache = new Map();
 let bitmapTextMaskCounter = 0;
 let bitmapTextFontVersion = 0;
-let textRenderMode = "bitmap";
+let textRenderMode = "vector";
 let textRenderModeVersion = 0;
 let viewportTextVersion = 0;
 let lastViewportTextSignature = "";
@@ -2065,10 +2065,12 @@ function getSvgTextZoomFactor() {
 }
 
 function updateSvgTextZoomCompensation() {
-  // Bitmap-маска (как в оригинале): именно этот рендер заказчик называл
-  // пиксель-перфектом. Тело таблицы остаётся живым HTML (копируемым), поэтому
-  // потеря копируемости масок панели/заголовков некритична.
-  const nextMode = "bitmap";
+  // Вектор `<text>` (как в эталоне): при дробном browser-zoom растровая
+  // bitmap-маска ресэмплируется → базовая линия «плавает» (текст двигается
+  // вверх/вниз, замечание #2). Вектор рисуется нативно сабпиксельно — дрожания
+  // нет. При этом вектор копируется/выделяется (как в эталоне). Решаем
+  // окончательно, без осцилляции bitmap↔vector.
+  const nextMode = "vector";
   const changed = nextMode !== textRenderMode;
 
   if (changed) {

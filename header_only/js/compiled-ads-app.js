@@ -3579,7 +3579,13 @@
     renderTable();
     applyLegendColors();
 
+    // Единая полоса прокрутки (замечание #1 «двойная прокрутка»). ТЗ п.9 ставит
+    // overflow-y:scroll И на html, И на body (`body:has(.ads-page)` в CSS) → две
+    // полосы. Оставляем скролл только на html (полоса сверху, ТЗ п.9), а полосу
+    // body гасим инлайн-стилем с !important (перебивает CSS `!important`), не
+    // редактируя сам CSS-макет.
     document.documentElement.style.overflowY = "scroll";
+    document.body.style.setProperty("overflow-y", "visible", "important");
 
     if (typeof renderStaticText === "function") renderStaticText();
     requestAnimationFrame(applyAdsStatic);
